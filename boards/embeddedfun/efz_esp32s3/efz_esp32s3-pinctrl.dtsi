@@ -1,0 +1,74 @@
+/*
+ * EFZ-ESP32S3 Rev 1 pin control.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/pinctrl/esp32s3-pinctrl.h>
+
+&pinctrl {
+	/* Box header P6 */
+	uart0_default: uart0_default {
+		group1 {
+			pinmux = <UART0_TX_GPIO43>;
+			output-high;
+		};
+
+		group2 {
+			pinmux = <UART0_RX_GPIO44>;
+			bias-pull-up;
+		};
+	};
+
+	/* SHT30 + MPU-6500, box header P5. External pull-ups on the board. */
+	i2c0_default: i2c0_default {
+		group1 {
+			pinmux = <I2C0_SDA_GPIO17>,
+				 <I2C0_SCL_GPIO18>;
+			drive-open-drain;
+			output-high;
+		};
+	};
+
+	/*
+	 * WS2812B data line. i2s0 stays disabled in the board; the LED strip
+	 * overlay enables it and adds the ws2812 node.
+	 */
+	i2s0_default: i2s0_default {
+		group1 {
+			pinmux = <I2S0_O_SD_GPIO21>;
+		};
+	};
+
+	/* RX: INMP441 microphone. TX: MAX98357A speaker amp. */
+	i2s1_default: i2s1_default {
+		group1 {
+			pinmux = <I2S1_I_BCK_GPIO2>,
+				 <I2S1_I_WS_GPIO4>,
+				 <I2S1_I_SD_GPIO3>,
+				 <I2S1_O_BCK_GPIO34>,
+				 <I2S1_O_WS_GPIO35>,
+				 <I2S1_O_SD_GPIO33>;
+		};
+	};
+
+	/* microSD, 4-bit. External 10k pull-ups on every line. */
+	sdhc0_default: sdhc0_default {
+		group1 {
+			pinmux = <SDHC0_CLKOUT_GPIO9>,
+				 <SDHC0_CMD_GPIO10>,
+				 <SDHC0_DATA0_GPIO8>,
+				 <SDHC0_DATA1_GPIO7>,
+				 <SDHC0_DATA2_GPIO12>,
+				 <SDHC0_DATA3_GPIO11>;
+			bias-pull-up;
+			output-high;
+		};
+
+		/* Card detect: socket shorts CD to GND when a card is inserted. */
+		group2 {
+			pinmux = <SDHC0_CD_GPIO6>;
+			bias-pull-up;
+		};
+	};
+};

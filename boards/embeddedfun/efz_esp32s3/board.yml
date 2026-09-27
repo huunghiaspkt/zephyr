@@ -1,0 +1,6 @@
+board:
+  name: efz_esp32s3
+  full_name: EFZ-ESP32S3
+  vendor: embeddedfun
+  socs:
+  - name: esp32s3

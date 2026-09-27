@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Bare ESP32-S3 (no in-package flash/PSRAM) with external 8 MB QSPI flash.
+config BOARD_EFZ_ESP32S3
+	select SOC_ESP32S3
+	select SOC_ESP32S3_PROCPU if BOARD_EFZ_ESP32S3_ESP32S3_PROCPU

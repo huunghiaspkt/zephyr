@@ -1,0 +1,199 @@
+/*
+ * EFZ-ESP32S3 Rev 1 — EmbeddedFun Zephyr training board.
+ *
+ * Bare ESP32-S3 (QFN56, no in-package flash/PSRAM), external 8 MB QSPI
+ * flash (EN25QH64A). Console on the native USB Serial/JTAG port.
+ *
+ * Not described here, on purpose:
+ *   - WS2812B on GPIO21: app overlay (i2s0 + worldsemi,ws2812-i2s).
+ *   - TFT connector (GPIO38-42, GPIO16): one overlay per display module.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/dts-v1/;
+
+#include <espressif/esp32s3/esp32s3.dtsi>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <espressif/partitions_0x0_amp_8M.dtsi>
+#include "efz_esp32s3-pinctrl.dtsi"
+
+/ {
+	model = "EmbeddedFun EFZ-ESP32S3 PROCPU";
+	compatible = "embeddedfun,efz-esp32s3", "espressif,esp32s3";
+
+	aliases {
+		led0 = &led1;
+		led1 = &led2;
+		sw0 = &button_bn1;
+		sw1 = &button_bn2;
+		sw2 = &button_boot;
+		i2c-0 = &i2c0;
+		uart-0 = &uart0;
+		accel0 = &mpu6500;
+		sdhc0 = &sdhc0;
+		watchdog0 = &wdt0;
+	};
+
+	chosen {
+		zephyr,sram = &sram1;
+		zephyr,console = &usb_serial;
+		zephyr,shell-uart = &usb_serial;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,bt-hci = &esp32_bt_hci;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led1: led_1 {
+			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 */
+			label = "LED1";
+		};
+
+		led2: led_2 {
+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;	/* GPIO46 */
+			label = "LED2";
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		/* BN1/BN2 and BOOT all have external 10k pull-ups. */
+		button_bn1: button_bn1 {
+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;	/* GPIO36 */
+			label = "BN1";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+
+		button_bn2: button_bn2 {
+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;	/* GPIO37 */
+			label = "BN2";
+			zephyr,code = <INPUT_KEY_1>;
+		};
+
+		button_boot: button_boot {
+			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+			label = "BOOT";
+			zephyr,code = <INPUT_KEY_2>;
+		};
+	};
+
+	zephyr,user {
+		/* NTC 10k B3950 with 10k pull-up, header P7 (GPIO1 = ADC1_CH0). */
+		io-channels = <&adc0 0>;
+
+		/* Both pulled low on the board: the parts stay off until an app drives these. */
+		mic-en-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;	/* INMP441 CHIPEN */
+		amp-sd-gpios = <&gpio1 15 GPIO_ACTIVE_HIGH>;	/* MAX98357A SD_MODE, GPIO47 */
+	};
+};
+
+&flash0 {
+	reg = <0x0 DT_SIZE_M(8)>;
+	ranges = <0x0 0x0 DT_SIZE_M(8)>;
+};
+
+&usb_serial {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-names = "default";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+
+	sht30: sht3xd@44 {
+		compatible = "sensirion,sht3xd";
+		reg = <0x44>;
+	};
+
+	/* MPU-6500: the mpu6050 driver identifies it by WHO_AM_I (0x70). */
+	mpu6500: mpu6050@69 {
+		compatible = "invensense,mpu6050";
+		reg = <0x69>;
+		int-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;	/* GPIO48 */
+	};
+};
+
+&adc0 {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1_4";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
+
+/* WS2812B lives on i2s0; the LED strip overlay enables it. */
+&i2s0 {
+	pinctrl-0 = <&i2s0_default>;
+	pinctrl-names = "default";
+};
+
+/* INMP441 on RX, MAX98357A on TX. */
+&i2s1 {
+	status = "okay";
+	pinctrl-0 = <&i2s1_default>;
+	pinctrl-names = "default";
+};
+
+&dma {
+	status = "okay";
+};
+
+&sdhc {
+	sdhc0: sdhc@0 {
+		status = "okay";
+		pinctrl-0 = <&sdhc0_default>;
+		pinctrl-names = "default";
+		bus-width = <4>;
+		max-bus-freq = <25000000>;
+
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			disk-name = "SD";
+			status = "okay";
+		};
+	};
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&trng0 {
+	status = "okay";
+};
+
+&esp32_bt_hci {
+	status = "okay";
+};
+
+&wifi {
+	status = "okay";
+};
