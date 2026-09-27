@@ -1,0 +1,17 @@
+/*
+ * ESP32-S3-DevKitC: an SHT30 module wired to I2C0 (SDA GPIO1, SCL GPIO2),
+ * ADDR pin low -> address 0x44.
+ *
+ * The EFZ-ESP32S3 needs no overlay: its board devicetree already has
+ * the on-board SHT30 at 0x44 with the node label "sht30".
+ */
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+
+	sht30: sht3xd@44 {
+		compatible = "sensirion,sht3xd";
+		reg = <0x44>;
+	};
+};

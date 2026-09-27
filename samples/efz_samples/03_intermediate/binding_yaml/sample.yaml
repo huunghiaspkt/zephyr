@@ -1,0 +1,15 @@
+sample:
+  name: Binding YAML
+  description: "A custom devicetree binding that drives a GPIO load switch"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+tests:
+  sample.efz.binding_yaml:
+    tags: efz

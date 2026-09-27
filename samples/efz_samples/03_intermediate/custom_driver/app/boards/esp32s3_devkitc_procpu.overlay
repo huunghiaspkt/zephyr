@@ -1,0 +1,15 @@
+/*
+ * Custom-driver demo overlay for ESP32-S3-DevKitC.
+ *
+ * Wires the out-of-tree `blink-gpio-led` driver to GPIO2.
+ * Attach an LED + resistor between GPIO2 and GND to see the blink;
+ * otherwise watch the log for "Setting LED period to N ms".
+ */
+
+/ {
+	blink_led: blink-led {
+		compatible = "blink-gpio-led";
+		led-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		blink-period-ms = <1000>;
+	};
+};

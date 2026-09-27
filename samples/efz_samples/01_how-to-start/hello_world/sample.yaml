@@ -1,0 +1,15 @@
+sample:
+  name: Hello World
+  description: "Print a greeting with the board name"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+tests:
+  sample.efz.hello_world:
+    tags: efz

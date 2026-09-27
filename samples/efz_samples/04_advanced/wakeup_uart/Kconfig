@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Wake up over UART sample"
+
+config APP_READY_BYTE
+	hex "READY token the device sends to the host"
+	range 0x0 0xff
+	default 0x06
+	help
+	  Sent once to the host after a phone connects and subscribes, meaning
+	  "you may start streaming data now".
+
+config APP_ADV_TIMEOUT_MS
+	int "No-phone window before sleeping (ms)"
+	default 30000
+	help
+	  After waking, advertise for this long. If no phone connects, go back to
+	  System OFF instead of advertising forever.
+
+config APP_UART_IDLE_MS
+	int "UART-idle window before sleeping (ms)"
+	default 5000
+	help
+	  While streaming, if the host sends nothing for this long, disconnect the
+	  phone and go back to System OFF.
+
+source "Kconfig.zephyr"

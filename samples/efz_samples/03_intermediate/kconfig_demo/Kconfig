@@ -1,0 +1,31 @@
+# Per-application Kconfig — symbols listed here can be set in prj.conf
+# or via west build -- -DCONFIG_FOO=y.
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "kconfig_demo"
+
+menu "Demo options"
+
+config DEMO_GREETING
+	string "Greeting printed at boot"
+	default "Hello from Kconfig"
+	help
+	  Strings live in Kconfig too — they become CONFIG_* macros usable
+	  in C with no quotes. See main.c for usage.
+
+config DEMO_LOOP_PERIOD_MS
+	int "Period of the demo loop in ms"
+	default 1000
+	range 100 5000
+	help
+	  Integer Kconfig — becomes a plain `int` constant in the binary.
+
+config DEMO_USE_FANCY_OUTPUT
+	bool "Use the fancy banner"
+	default y
+	help
+	  Boolean Kconfig — guards an optional feature with IS_ENABLED().
+
+endmenu
+
+source "Kconfig.zephyr"

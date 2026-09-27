@@ -1,0 +1,94 @@
+/*
+ * EFZ-ESP32S3 + 1.47" rounded IPS TFT, ST7789V3, 172x320, SPI.
+ *
+ * Wiring (fixed on the board, TFT connector):
+ *   SCL GPIO40, SDA GPIO41, CS GPIO39, DC GPIO38, RST GPIO42,
+ *   backlight GPIO16 (through a MOSFET, high = on) as gpio-leds node `tft_bl`,
+ *   off at boot: turn it on with led_on() or gpio_pin_set_dt() before drawing.
+ * These pins are shared with header P4 (GPIO38-42) and P3 (GPIO16).
+ *
+ * Use: west build -b efz_esp32s3/esp32s3/procpu <app> -- \
+ *        -DEXTRA_DTC_OVERLAY_FILE=<path>/efz_esp32s3_st7789v3_172x320.overlay
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+#include <zephyr/dt-bindings/display/panel.h>
+
+/ {
+	chosen {
+		zephyr,display = &st7789v;
+	};
+
+	mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		dc-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;		/* GPIO38 */
+		reset-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;	/* GPIO42 */
+		write-only;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		st7789v: st7789v@0 {
+			compatible = "sitronix,st7789v";
+			reg = <0>;
+			mipi-max-frequency = <20000000>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+
+			/* 172 columns centred in the controller's 240-column RAM. */
+			width = <172>;
+			height = <320>;
+			x-offset = <34>;
+			y-offset = <0>;
+
+			pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+			mdac = <0x00>;
+			vcom = <0x19>;
+			gctrl = <0x35>;
+			vrhs = <0x12>;
+			vdvs = <0x20>;
+			gamma = <0x01>;
+			lcm = <0x2c>;
+			porch-param = [0c 0c 00 33 33];
+			cmd2en-param = [5a 69 02 01];
+			pwctrl1-param = [a4 a1];
+			pvgam-param = [d0 04 0d 11 13 2b 3f 54 4c 18 0d 0b 1f 23];
+			nvgam-param = [d0 04 0c 11 13 2c 3f 44 51 2f 1f 1f 20 23];
+			ram-param = [00 f0];
+			rgb-param = [cd 08 14];
+		};
+	};
+};
+
+&pinctrl {
+	spim2_tft: spim2_tft {
+		group1 {
+			pinmux = <SPIM2_SCLK_GPIO40>,
+				 <SPIM2_CSEL_GPIO39>;
+		};
+
+		group2 {
+			pinmux = <SPIM2_MOSI_GPIO41>;
+			output-low;
+		};
+	};
+};
+
+&spi2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	pinctrl-0 = <&spim2_tft>;
+	pinctrl-names = "default";
+};
+
+/ {
+	leds {
+		/* Backlight through a MOSFET: high = on. Off at boot — the app turns it on. */
+		tft_bl: tft_backlight {
+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;	/* GPIO16 */
+			label = "TFT backlight";
+		};
+	};
+};

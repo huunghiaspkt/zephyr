@@ -1,0 +1,13 @@
+sample:
+  name: TFT alignment test
+  description: "Draw a border and coloured corners to check display colour, offset and orientation"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+tests:
+  sample.efz.alignment_test:
+    extra_args: EXTRA_DTC_OVERLAY_FILE=../efz_esp32s3_st7789v3_172x320.overlay

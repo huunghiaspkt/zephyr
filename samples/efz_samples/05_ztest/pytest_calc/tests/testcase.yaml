@@ -1,0 +1,10 @@
+tests:
+  calc.testing.pytest:
+    platform_allow: [native_sim]
+    integration_platforms: [native_sim]
+    harness: pytest
+    # default pytest_root is "pytest/" next to this file; spelled out for clarity
+    harness_config:
+      pytest_root:
+        - "pytest/test_calc.py"
+    tags: test_framework

@@ -1,0 +1,18 @@
+# Zephyr / west build artifacts
+build/
+build_*/
+twister-out*/
+
+# pytest harness (twister) artifacts
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python venv (in case anyone runs west from inside the repo)
+.venv/
+__pycache__/
+*.pyc

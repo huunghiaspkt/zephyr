@@ -1,0 +1,15 @@
+sample:
+  name: Custom driver
+  description: "Out-of-tree blink driver with its own API and binding"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+    - esp32s3_devkitc/esp32s3/procpu
+tests:
+  sample.efz.custom_driver:
+    tags: efz

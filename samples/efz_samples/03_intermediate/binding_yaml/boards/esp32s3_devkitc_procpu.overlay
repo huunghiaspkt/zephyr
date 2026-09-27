@@ -1,0 +1,14 @@
+/*
+ * ESP32-S3-DevKitC overlay for the custom binding sample.
+ *
+ * The node below uses the `power-switch` binding defined in
+ * dts/bindings/power-switch.yaml. Connect any LED + resistor (or
+ * scope probe) to GPIO2 to observe the switch toggling.
+ */
+
+/ {
+	load_switch: load-switch {
+		compatible = "power-switch";
+		gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+	};
+};
