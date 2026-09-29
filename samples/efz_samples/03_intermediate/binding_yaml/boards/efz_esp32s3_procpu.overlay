@@ -1,5 +1,5 @@
 /*
- * EFZ-ESP32S3: drive the on-board LED1 (GPIO45) as the "load switch".
+ * EFZ-ESP32S3: drive the on-board LED2 (GPIO45) as the "load switch".
  * (GPIO2, used on the DevKitC, is the microphone clock on this board.)
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -8,6 +8,6 @@
 / {
 	load_switch: load-switch {
 		compatible = "power-switch";
-		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 = LED1 */
+		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 = LED2 */
 	};
 };
