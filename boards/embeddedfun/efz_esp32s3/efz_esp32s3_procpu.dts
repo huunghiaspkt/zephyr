@@ -48,13 +48,14 @@
 	leds {
 		compatible = "gpio-leds";
 
+		/* Names follow the board silkscreen: LED1 is on GPIO46, LED2 on GPIO45. */
 		led1: led_1 {
-			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 */
+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;	/* GPIO46 */
 			label = "LED1";
 		};
 
 		led2: led_2 {
-			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;	/* GPIO46 */
+			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 */
 			label = "LED2";
 		};
 	};

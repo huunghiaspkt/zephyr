@@ -1,5 +1,5 @@
 /*
- * EFZ-ESP32S3: blink the on-board LED1 (GPIO45).
+ * EFZ-ESP32S3: blink the on-board LED2 (GPIO45).
  * (GPIO2, used on the DevKitC, is the microphone clock on this board.)
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -8,7 +8,7 @@
 / {
 	blink_led: blink-led {
 		compatible = "blink-gpio-led";
-		led-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 = LED1 */
+		led-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;	/* GPIO45 = LED2 */
 		blink-period-ms = <1000>;
 	};
 };

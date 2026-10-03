@@ -128,7 +128,7 @@ Connections and IOs
      - GPIO21
    * - LEDs
      - LED1, LED2 (active-high)
-     - GPIO45, GPIO46
+     - GPIO46, GPIO45
    * - Buttons
      - BOOT, RESET; BN1, BN2 (active-low, 10 kΩ pull-up)
      - GPIO0, CHIP_PU; GPIO36, GPIO37
@@ -167,11 +167,11 @@ Strapping pins
      - Runs from flash; hold BOOT for download mode
    * - GPIO46
      - Boot mode, ROM log
-     - LED2 with 1 kΩ to GND
+     - LED1 with 1 kΩ to GND
      - 0, as download mode requires
    * - GPIO45
      - VDD_SPI voltage
-     - LED1 with 1 kΩ to GND
+     - LED2 with 1 kΩ to GND
      - 0, so VDD_SPI is 3.3 V as the EN25QH64A flash needs
    * - GPIO3
      - JTAG source
