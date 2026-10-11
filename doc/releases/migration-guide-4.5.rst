@@ -80,6 +80,21 @@ Build System
   :kconfig:option:`CONFIG_WARN_DEPRECATED` can be used instead, simply replace lines with
   ``CONFIG_DEPRECATION_TEST=y`` with ``CONFIG_WARN_DEPRECATED=n``.
 
+* The hardening tool's data file :file:`scripts/kconfig/hardened.csv` has been replaced by a
+  YAML database: profiles in :file:`scripts/kconfig/hardening.yaml` and per-subsystem
+  ``hardening.yaml`` fragments next to the Kconfig files they relate to. Downstream forks that
+  patched the CSV should migrate their entries to the new format (see :ref:`hardening`); out-of-tree
+  recommendations no longer require patching the in-tree file at all and can instead be provided
+  via ``-DHARDENCONFIG_EXTRA_SOURCES=``. Note that ``CONFIG_DEBUG_COREDUMP`` was listed in the
+  CSV with a syntax error and was silently skipped; it is now actually checked, so
+  ``hardenconfig`` may report it as a new finding. Three CSV entries were dropped rather than
+  migrated: ``CONFIG_STACK_USAGE``, which only produces build-time :file:`.su` files and does not
+  affect the image, and ``CONFIG_MPU_STACK_GUARD`` and ``CONFIG_BUILTIN_STACK_GUARD``, which are
+  mutually exclusive mechanisms arbitrated by :kconfig:option:`CONFIG_HW_STACK_PROTECTION` —
+  recommending both flagged the wrong one on cores with stack pointer limit registers. Enabling
+  :kconfig:option:`CONFIG_HW_STACK_PROTECTION`, which is still recommended, lets the architecture
+  pick.
+
 Kernel
 ******
 
@@ -137,6 +152,32 @@ Kernel
   be used as futex address. The error -EINVAL can no longer happen on futex
   operations.
 
+* The :ref:`object core framework <object_cores_api>` no longer links objects
+  into per-type lists through a node in the object. Statically defined objects
+  are enumerated in place and objects initialized at run time are referenced
+  from a bounded registry sized by
+  :kconfig:option:`CONFIG_OBJ_CORE_MAX_DYNAMIC_OBJECTS`. The ``node`` member of
+  :c:struct:`k_obj_core` and the ``list`` member of :c:struct:`k_obj_type` are
+  removed; tools that walked those lists must use
+  :c:func:`k_obj_type_walk_locked` or :c:func:`k_obj_type_walk_unlocked`.
+  :c:macro:`K_OBJ_TYPE_DEFINE` now defines the :c:struct:`k_obj_type` variable
+  itself, so a separate declaration of that variable must be dropped. Objects
+  located in a thread's stack or in the interrupt stack are no longer
+  registered, and :kconfig:option:`CONFIG_OBJ_CORE` selects
+  :kconfig:option:`CONFIG_THREAD_STACK_INFO`, which adds the stack information
+  fields to every :c:struct:`k_thread`. The new
+  :kconfig:option:`CONFIG_OBJ_CORE_QUEUE`, enabled by default, adds an object
+  core to every :c:struct:`k_queue`; as FIFOs and LIFOs embed a queue, they are
+  reported by both their own object type and the queue type.
+
+* Object tracking (:kconfig:option:`CONFIG_TRACING_OBJECT_TRACKING`) is now
+  provided by the object core framework, which it selects. The
+  ``_track_list_k_*`` list heads, the ``SYS_PORT_TRACK_NEXT()`` macro, the
+  ``sys_track_*_init()`` hooks and the :file:`include/zephyr/tracing/tracking.h`
+  header are removed. Code that walked the tracking lists must use
+  :c:func:`k_obj_type_walk_locked` or :c:func:`k_obj_type_walk_unlocked` with
+  the object type found by :c:func:`k_obj_type_find`.
+
 Boards
 ******
 
@@ -166,6 +207,14 @@ Boards
   ``SOC_RP2350[AB]_HAZARD3``/``_M33`` Kconfig symbols are deprecated and will both be removed in a
   future release.
 
+* :zephyr:board:`rak4631` now supports the WisBlock ecosystem. A WisBlock Base
+  Board shield (e.g. :ref:`rakwireless_rak19007`) is required to expose the
+  sensor and IO slots:
+
+  .. code-block:: shell
+
+     west build -b rak4631/nrf52840 --shield rakwireless_rak19007
+
 * The Kconfig options :kconfig:option:`CONFIG_SRAM_SIZE` and
   :kconfig:option:`CONFIG_SRAM_BASE_ADDRESS` have been deprecated, boards should instead use the
   devicetree ``zephyr.sram`` chosen node to specify the RAM node which will be used (whose values
@@ -192,6 +241,13 @@ Boards
     :kconfig:option:`CONFIG_SOC_SERIES_NRF71`.
 
 * Aesc Silicon ``elemrv`` board is renamed to ``elemrv_flask_n``.
+
+* The STMicroelectronics ``stm32mp157c_dk2`` board has been renamed to
+  ``stm32mp157x_dk2`` and now references both SoC variants. Build for the
+  STM32MP157C-DK2 with ``-b stm32mp157x_dk2/stm32mp157cxx`` and for the
+  STM32MP157F-DK2 with ``-b stm32mp157x_dk2/stm32mp157fxx``. The previous
+  ``-b stm32mp157c_dk2`` is deprecated and now maps to
+  ``stm32mp157x_dk2/stm32mp157cxx``.
 
 * The Nordic sysbuild Kconfig option ``SB_CONFIG_NRF_HALTIUM_GENERATE_UICR``
   has been renamed to :kconfig:option:`SB_CONFIG_NRF_GENERATE_UICR`.
@@ -384,15 +440,14 @@ Boards
 * The Silabs Kconfig option ``CONFIG_SOC_SILABS_PM_LOW_INTERRUPT_LATENCY``
   has been renamed to :kconfig:option:`CONFIG_SOC_VENDOR_SILABS_PM_LOW_INTERRUPT_LATENCY`.
 
-* The stm32h573i_dk and stm32h5f5j_dk disco kit are now adopting the mspi controller model.
-  This is the next step of the migration to mspi stm32 support. For both boards, declare the xspi
-  node as ``st,stm32-xspi-controller`` compatible. The stm32h5 device DTS will be updated
-  once all the target boards are changed.
+* The stm32h573i_dk, stm32h5f5j_dk disco kit are now adopting the mspi controller model.
+  This is the next step of the migration to mspi stm32 support.
+  For both boards, declare the xspi node as ``st,stm32-xspi-controller`` compatible.
 
-* The stm32l562e disco kit is now adopting the mspi controller model.
+* The stm32l562e and stm32h735g_disco kit are now adopting the mspi controller model.
   This is the next step of the migration to mspi stm32 support.
   For that board, declare the ospi node as ``st,stm32-ospi-controller`` compatible.
-  The stm32l5 device DTS will be updated once all the target boards are changed.
+  The stm32l5 and stm32h735 devices DTS will be updated once all the target boards are changed.
 
 Device Drivers and Devicetree
 *****************************
@@ -645,6 +700,10 @@ Controller Area Network (CAN)
   :c:func:`can_fire_state_change_callbacks` for firing CAN controller state change callbacks
   (:github:`117889`).
 
+* The CAN bus network driver (:kconfig:option:`CONFIG_NET_CANBUS`) now defines a network interface
+  for each CAN controller device defined with :c:macro:`CAN_DEVICE_DT_DEFINE` or
+  :c:macro:`CAN_DEVICE_DT_INST_DEFINE`, instead of one for the ``zephyr,canbus`` chosen node.
+
 Counter
 =======
 
@@ -663,6 +722,13 @@ Counter
   ``clk_32k`` node for 32 kHz clock source selection. The clock source is now configured through the
   ``clocks`` property of the ``clk_32k`` node, instead of ``clock-source`` property in each
   peripheral node (:github:`117709`).
+
+* The NXP RTC counter drivers (:dtcompatible:`nxp,rtc`, :dtcompatible:`nxp,lpc-rtc` and
+  :dtcompatible:`nxp,imx-snvs-rtc`) now return ``-ETIME`` instead of ``-EINVAL`` from
+  :c:func:`counter_set_channel_alarm` when an absolute alarm is set too late, matching the counter
+  API contract. Applications that checked for ``-EINVAL`` on the late-absolute-alarm path must check
+  for ``-ETIME`` instead. An absolute target equal to the current counter value is now also reported
+  as late (``-ETIME``), and the late check no longer applies to relative alarms.
 
 Devicetree
 ==========
@@ -750,6 +816,12 @@ Display
   invalidated areas are rounded to the required boundary before reaching the
   driver. (:github:`117765`)
 
+* The ssd16xx display driver now reports :c:enumerator:`PIXEL_FORMAT_MONO01` instead of
+  :c:enumerator:`PIXEL_FORMAT_MONO10`, which matches the controller RAM, where a set bit is a
+  white pixel. LVGL and the character framebuffer draw with the intended colors without any
+  change. Applications that pass their own buffers to :c:func:`display_write` and inverted them
+  to compensate for the former pixel format must drop that inversion.
+
 DMA
 ===
 
@@ -802,6 +874,10 @@ ESPI
     now declares the ``ldn`` (logical device number) property required by
     :dtcompatible:`microchip,xec-espi-host-dev`. Out-of-tree boards that override or add
     host-device child nodes for these SoCs must set ``ldn`` on each.
+
+* The board power node compatible of the :zephyr:code-sample:`espi` sample has been renamed from
+  ``intel-rvp,board-power`` to ``intel,rvp-board-power``. Out-of-tree board overlays for this
+  sample must use the new compatible.
 
 Ethernet
 ========
@@ -1528,6 +1604,10 @@ Serial
   driver, which now provides support for the Broadcom BCM283x auxiliary UART through vendor-specific
   extensions. (:github:`115112`)
 
+* :kconfig:option:`CONFIG_UART_NS16550_DW8250_DW_APB` now follows devicetree: it is
+  enabled for :dtcompatible:`snps,dw-apb-uart` nodes and cannot be set otherwise. Add that
+  compatible to the UART nodes instead of setting the option in Kconfig. (:github:`120368`)
+
 SPI
 ===
 
@@ -1661,6 +1741,24 @@ STM32
   For :dtcompatible:`st,stm32f1-adc` and :dtcompatible:`st,stm32f4-adc`, each instance keeps its
   own register clock, so ``clocks`` and ``clock-names`` stay on the ``&adcN`` node.
   (:github:`117309`)
+
+* STM32 ADC (:dtcompatible:`st,stm32-adc`): when
+  :kconfig:option:`CONFIG_ADC_STM32_VREFINT_CALIBRATE` is enabled (default
+  whenever an okay :dtcompatible:`st,stm32-vref` node exists),
+  :c:func:`adc_ref_internal` and INTERNAL :c:func:`adc_raw_to_millivolts_dt`
+  results may no longer match DT ``vref-mv`` / 3300 exactly. Disable the
+  Kconfig to keep the previous static DT-only scale.
+
+  ``adc_ref_internal()`` no longer reports the first common block's
+  ``vref-mv`` for every STM32 ADC child. Each child uses its parent common
+  block's ``vref-mv`` (optional, default 3300). This only affects multi-common
+  DTs that set divergent ``vref-mv`` values and relied on the old shared
+  ``DEVICE_API``.
+
+  VREFINT measurement is no longer tied to the first okay
+  :dtcompatible:`st,stm32-vref` node. Any enabled ADC child named by a vref
+  node's ``io-channels`` (including disabled vref nodes) can refresh the
+  shared rail cache. (:github:`117114`)
 
 * :dtcompatible:`st,hci-stm32wba` and :dtcompatible:`st,stm32wba-ieee802154` nodes
   (with nodelabels ``bt_hci_wba`` and ``ieee802154`` respectively) are now
@@ -2175,6 +2273,27 @@ Bluetooth HCI
   their data (:c:struct:`bt_hci_driver_data`) and config (:c:struct:`bt_hci_driver_config`)
   structs.
 
+* The HCI driver ``setup()`` op, :c:func:`bt_hci_setup`, :c:struct:`bt_hci_setup_params`,
+  :kconfig:option:`CONFIG_BT_HCI_SETUP` and the ``bt_h4_vnd_setup()`` hook of the H:4 driver are
+  deprecated and will be removed two releases from now. A driver that implements ``setup()``
+  moves that work into :c:member:`bt_hci_driver_api.open`:
+
+  * Send the vendor-specific commands with :c:func:`bt_hci_lockstep_cmd_send_sync`, over the
+    driver's own transport, instead of with the Host's command APIs, and feed every received
+    packet to :c:func:`bt_hci_lockstep_feed`. The helpers of
+    :file:`include/zephyr/bluetooth/hci_pkt.h` frame the commands. After resetting the
+    controller by other means than an HCI command, call :c:func:`bt_hci_lockstep_reset`.
+  * Read the public address with :c:func:`bt_hci_get_public_addr` instead of taking it from
+    :c:member:`bt_hci_setup_params.public_addr`. As there, it is ``BT_ADDR_ANY``, and not
+    ``BT_ADDR_NONE``, when no public address was set.
+  * Remove ``select BT_HCI_SETUP`` from the driver's Kconfig.
+
+  The initialization then also runs in a build without a Host, where ``setup()`` was never
+  called. With a Host it runs in the thread that calls :c:func:`bt_enable`, before that function
+  returns, also when a ready callback is passed; ``setup()`` ran from the system workqueue in
+  that case. This holds for every in-tree driver that implemented ``setup()``, as they have all
+  been converted.
+
 * The HCI driver :c:member:`bt_hci_driver_api.open` callback no longer has a ``recv`` parameter;
   rather the common HCI driver layer code takes care of managing this as part of the common
   data struct. There is a new :c:func:`bt_hci_recv` API for drivers to pass data the higher
@@ -2198,6 +2317,15 @@ Bluetooth HCI
   more once ``close()`` has succeeded, and the driver operations other than ``setup()`` do not
   use the Host's HCI command APIs. Out-of-tree HCI drivers, and out-of-tree code that calls
   the HCI driver API directly, may have to be changed to follow these rules.
+
+* An H:4 vendor extension configures its controller from :c:func:`bt_h4_vnd_open`, declared in
+  :zephyr_file:`include/zephyr/drivers/bluetooth/h4.h`, which the H:4 driver calls at the end of
+  its ``open()`` with a lockstep helper for the extension's commands, instead of from
+  ``bt_h4_vnd_setup()`` and the ``setup()`` op. The extension selects
+  :kconfig:option:`CONFIG_BT_H4_VND_OPEN` in place of :kconfig:option:`CONFIG_BT_HCI_SETUP` and
+  reads the public address with :c:func:`bt_hci_get_public_addr` instead of taking it from the
+  setup parameters. ``bt_h4_vnd_setup()`` is still called through the ``setup()`` op by an
+  extension that keeps selecting :kconfig:option:`CONFIG_BT_HCI_SETUP`.
 
 Bluetooth Host
 ==============
@@ -2762,6 +2890,19 @@ MCUmgr
   :ref:`mcumgr_os_application_info` command now always reports the board target as hardware
   platform; the pre-4.3 board and board revision output is no longer available.
 
+* :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_UART_MTU` and
+  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_SHELL_MTU` have been deprecated. They only set the value
+  returned by the deprecated ``get_mtu`` callback, which the SMP layer does not use: serial frames
+  are limited to 127 bytes and the maximum SMP packet size is set by
+  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE`. Remove them from configuration files; a
+  deprecation warning is emitted when they are changed from their default.
+
+* The ``get_mtu`` member of :c:struct:`smp_transport_api_t` and the
+  :c:type:`smp_transport_get_mtu_fn` type have been deprecated, as the SMP layer never calls
+  them. Out-of-tree code should stop setting or calling ``get_mtu``. Transports remain
+  responsible for fragmenting outgoing packets in their ``output`` function (see
+  :c:type:`smp_transport_out_fn`).
+
 * The image management client (:kconfig:option:`CONFIG_MCUMGR_GRP_IMG_CLIENT`)
   now supports SHA-512 image digests in addition to SHA-256:
 
@@ -2777,6 +2918,12 @@ MCUmgr
   :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_NETBUF_SIZE`, and a larger value now fails at
   configuration time. When the buffer is smaller than 1500 bytes, the MTU now defaults to the
   buffer size instead of 1500.
+
+* :c:func:`smp_client_single_response` takes the SMP transport the response was received on as
+  a new first argument, and ``res_hdr`` must be in host byte order. A response now only
+  completes a pending command that was sent on that transport and has the same group and
+  command ID. Responses from a server that does not echo the group and command ID are ignored,
+  and the command is retried until it times out.
 
 Network buffers
 ===============
@@ -2794,6 +2941,19 @@ POSIX
 
 * ``CONFIG_POSIX_READER_WRITER_LOCKS`` has been removed. Use
   :kconfig:option:`CONFIG_POSIX_RW_LOCKS` instead.
+
+Power Management
+================
+
+* The new, default-off experimental option
+  :kconfig:option:`CONFIG_PM_EARLY_SYSTEM_TIMER_RESUME` selects the sequence introduced by
+  :github:`118977`: SoC post-ops, system timer idle-exit, device resume, then PM exit notifications.
+  Enable it only after validating platform dependencies and timeout callbacks. SoC post-ops
+  run before device resume, and timer idle-exit may invoke :c:struct:`k_timer` expiry functions
+  while devices are still suspended. Without this option, timer-based :c:func:`k_busy_wait`
+  in device resume callbacks remains unsupported when the low-power state stopped the timer.
+
+  (:github:`120960`)
 
 Random
 ======
@@ -2867,6 +3027,48 @@ Modules
 lvgl
 ====
 
+* LVGL was updated from v9.5 to v9.6. See the `LVGL migration guide
+  <https://lvgl.io/docs/open/changelog/migration-v9-6>`_ for the changes of LVGL itself.
+
+* LVGL v9.6 deprecates the ``LV_COLOR_DEPTH`` choice in favor of the ``LV_COLOR_FORMAT_DEFAULT``
+  choice, and ``CONFIG_LV_COLOR_DEPTH_*`` options no longer select the color format in Zephyr.
+  Replace them with ``CONFIG_LV_COLOR_FORMAT_*``, for example ``CONFIG_LV_COLOR_DEPTH_16=y`` with
+  ``CONFIG_LV_COLOR_FORMAT_RGB565=y``.
+
+* ``CONFIG_LV_ATTRIBUTE_MEM_ALIGN_SIZE`` was replaced by
+  :kconfig:option:`CONFIG_LV_Z_ATTRIBUTE_MEM_ALIGN_SIZE`.
+
+* Boards, shields and SoCs no longer set LVGL options in ``Kconfig.defconfig`` files, as these
+  options are not defined when the LVGL module is absent. They set Zephyr options instead, which
+  provide the defaults of the LVGL options. Out-of-tree boards, shields and SoCs have to replace:
+
+  * the ``LV_COLOR_DEPTH`` choice with the ``LV_Z_COLOR_FORMAT`` choice, for example
+    ``LV_COLOR_DEPTH_16`` with ``LV_Z_COLOR_FORMAT_RGB565``,
+  * ``LV_DPI_DEF`` and ``LV_DRAW_BUF_ALIGN`` with :kconfig:option:`CONFIG_LV_Z_DPI_DEF` and
+    :kconfig:option:`CONFIG_LV_Z_DRAW_BUF_ALIGN`,
+  * ``LV_USE_DRAW_DMA2D`` with :kconfig:option:`CONFIG_LV_Z_DRAW_DMA2D_DEFAULT`,
+  * ``LV_USE_DRAW_DMA2D_INTERRUPT`` and ``LV_DRAW_DMA2D_HAL_INCLUDE`` with
+    :kconfig:option:`CONFIG_LV_Z_DRAW_DMA2D_INTERRUPT` and
+    :kconfig:option:`CONFIG_LV_Z_DRAW_DMA2D_HAL_INCLUDE`,
+  * ``LV_NEMA_USE_CACHE`` and ``LV_NEMA_CACHE_HAL_INCLUDE`` with
+    :kconfig:option:`CONFIG_LV_Z_NEMA_USE_CACHE` and
+    :kconfig:option:`CONFIG_LV_Z_NEMA_CACHE_HAL_INCLUDE`,
+  * the ``LV_USE_NEMA_LIB`` choice with one of the ``LV_Z_NEMA_LIB_*`` options, for example
+    :kconfig:option:`CONFIG_LV_Z_NEMA_LIB_M7`.
+
+  The ``LV_USE_NEMA_HAL`` choice needs no replacement, as the custom HAL used by Zephyr is the LVGL
+  default. Applications setting LVGL options in ``.conf`` files are not affected.
+
+* The log level of the Zephyr LVGL integration no longer follows the LVGL log level. It is now
+  selected with the standard :kconfig:option:`CONFIG_LV_Z_LOG_LEVEL` choice
+  (``CONFIG_LV_Z_LOG_LEVEL_DBG`` etc.) and defaults to :kconfig:option:`CONFIG_LOG_DEFAULT_LEVEL`.
+  LVGL's own logging is still configured with ``CONFIG_LV_USE_LOG`` and ``CONFIG_LV_LOG_LEVEL_*``.
+  LVGL messages forwarded to the Zephyr logging subsystem are filtered by both levels, so set
+  ``CONFIG_LV_Z_LOG_LEVEL_DBG=y`` to see LVGL trace messages.
+
+* ``CONFIG_LV_USE_SYSMON`` no longer implies :kconfig:option:`CONFIG_CPU_LOAD`. Enable
+  :kconfig:option:`CONFIG_CPU_LOAD` for the system monitor to report the CPU usage.
+
 * The ``zephyr,lvgl-pointer-input`` devicetree binding marks the ``swap-xy``, ``invert-x``, and
   ``invert-y`` properties as **deprecated**. Users should instead add the corresponding
   touchscreen properties ``swapped-x-y``, ``inverted-x``, and ``inverted-y`` to the underlying
@@ -2888,6 +3090,12 @@ lvgl
 
 hal_nxp
 =======
+
+* The ``CONFIG_LV_USE_GPU_NXP_PXP`` Kconfig option has been removed. It only enabled the NXP PXP
+  HAL driver component, which is already enabled by :kconfig:option:`CONFIG_MCUX_PXP`, defaulting
+  to ``y`` when the :dtcompatible:`nxp,pxp` devicetree node is enabled and
+  :kconfig:option:`CONFIG_DISPLAY` is set. Applications that use the PXP driver component
+  without the display subsystem must enable :kconfig:option:`CONFIG_MCUX_PXP` explicitly.
 
 * S32K344: The pinmux header file for this SoC was renamed from ``S32K344-172MQFP-pinctrl.h`` to
   ``S32K344_K324_K314_172HDQFP-pinctrl.h``. Out-of-tree boards must update their include directive accordingly::

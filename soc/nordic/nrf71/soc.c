@@ -254,6 +254,21 @@ int nordicsemi_nrf71_init(void)
 	wifi_setup();
 #endif
 
+	/* Power P4 on or off explicitly, as the boards disagree on its initial state.
+	 * This should be turned off when not using P4 as it can draw roughly 40 uA of
+	 * current, even in System OFF.
+	 *
+	 * The selected voltage mode must match what actually drives the port's VDDIO
+	 * pin on the board; mismatching them can damage the port.
+	 */
+#if !DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(gpio4))
+	NRF_P4->PWRCTRL = P4_PWRCTRL_OFF;
+#elif DT_ENUM_HAS_VALUE(DT_NODELABEL(gpio4), nordic_pad_voltage, 1v8)
+	NRF_P4->PWRCTRL = P4_PWRCTRL_1V8;
+#else
+	NRF_P4->PWRCTRL = P4_PWRCTRL_3V3;
+#endif
+
 	/* Configure LFXO capacitive load if internal load capacitors are used */
 #if DT_ENUM_HAS_VALUE(LFXO_NODE, load_capacitors, internal)
 	nrf_lfxo_cload_set(NRF_LFXO,
@@ -269,11 +284,6 @@ int nordicsemi_nrf71_init(void)
 	return 0;
 }
 
-void soc_early_init_hook(void)
-{
-	(void)nordicsemi_nrf71_init();
-}
-
 void arch_busy_wait(uint32_t time_us)
 {
 	nrfx_coredep_delay_us(time_us);
@@ -283,5 +293,6 @@ void arch_busy_wait(uint32_t time_us)
 void soc_reset_hook(void)
 {
 	SystemInit();
+	nordicsemi_nrf71_init();
 }
 #endif

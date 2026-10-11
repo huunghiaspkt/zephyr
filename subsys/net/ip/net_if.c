@@ -498,6 +498,7 @@ enum net_verdict net_if_try_send_data(struct net_if *iface, struct net_pkt *pkt,
 	struct net_context *context = net_pkt_context(pkt);
 	struct net_linkaddr *dst = net_pkt_lladdr_dst(pkt);
 	enum net_verdict verdict = NET_OK;
+	net_sa_family_t family;
 	int status = -EIO;
 
 	if (!net_if_flag_is_set(iface, NET_IF_LOWER_UP) ||
@@ -560,12 +561,18 @@ enum net_verdict net_if_try_send_data(struct net_if *iface, struct net_pkt *pkt,
 
 	/* If the ll dst address is not set check if it is present in the nbr
 	 * cache.
+	 *
+	 * The family is read once, before the call. A prepare function that
+	 * returns NET_CONTINUE has handed the packet over (IPv6 neighbor
+	 * discovery pending queue, fragmentation): it can be sent, freed and
+	 * its memory reused by another packet before this thread runs again,
+	 * so the packet must not be looked at after the call.
 	 */
-	if (IS_ENABLED(CONFIG_NET_IPV6) && net_pkt_family(pkt) == NET_AF_INET6) {
-		verdict = net_ipv6_prepare_for_send(pkt);
-	}
+	family = net_pkt_family(pkt);
 
-	if (IS_ENABLED(CONFIG_NET_IPV4) && net_pkt_family(pkt) == NET_AF_INET) {
+	if (IS_ENABLED(CONFIG_NET_IPV6) && family == NET_AF_INET6) {
+		verdict = net_ipv6_prepare_for_send(pkt);
+	} else if (IS_ENABLED(CONFIG_NET_IPV4) && family == NET_AF_INET) {
 		verdict = net_ipv4_prepare_for_send(pkt);
 	}
 
@@ -729,6 +736,22 @@ static enum net_l2_flags l2_flags_get(struct net_if *iface)
 }
 
 #if defined(CONFIG_NET_IP)
+/* Tell the L2 that the IP level has started or stopped using a multicast
+ * address, so that the receive filter of the device can be updated.
+ */
+static int net_if_mcast_ip_addr_update(struct net_if *iface __maybe_unused,
+				       const struct net_addr *addr __maybe_unused,
+				       bool add __maybe_unused)
+{
+#if defined(CONFIG_NET_L2_ETHERNET)
+	if (net_if_l2(iface) == &NET_L2_GET_NAME(ETHERNET) ||
+	    net_eth_is_vlan_interface(iface)) {
+		return net_eth_mcast_ip_addr_update(iface, addr, add);
+	}
+#endif
+	return -ENOTSUP;
+}
+
 /* Return how many bits are shared between two IP addresses */
 static uint8_t get_ipaddr_diff(const uint8_t *src, const uint8_t *dst, int addr_len)
 {
@@ -1217,6 +1240,13 @@ static void ipv6_config_defaults_set(struct net_if_ipv6 *ipv6)
 	IF_ENABLED(CONFIG_NET_IPV6_IID_STABLE, (ipv6->iid = NULL));
 	IF_ENABLED(CONFIG_NET_IPV6_IID_STABLE, (ipv6->network_counter = 0));
 	IF_ENABLED(CONFIG_NET_IPV6_PE, (ipv6->desync_factor = 0));
+
+#if defined(CONFIG_NET_IPV6_MLD)
+	ipv6->mld_general_timeout = sys_timepoint_calc(K_FOREVER);
+	/* No MLDv1 querier heard: the timer has expired */
+	ipv6->mld_v1_querier_timeout = sys_timepoint_calc(K_NO_WAIT);
+	ipv6->mld_version = 0U;
+#endif
 }
 
 static void ipv6_prefix_rm_all(struct net_if *iface, struct net_if_ipv6 *ipv6)
@@ -1657,6 +1687,13 @@ static void dad_timeout(struct k_work *work)
 		 * needed in this case as the address is our own one.
 		 */
 		net_ipv6_nbr_rm(iface, &ifaddr->address.in6_addr);
+
+		/* Multicast groups joined so far were reported with the
+		 * unspecified source, RFC 3810 ch 5.2.13.
+		 */
+		if (net_ipv6_is_ll_addr(&ifaddr->address.in6_addr)) {
+			net_ipv6_mld_report_all(iface);
+		}
 	}
 }
 
@@ -2493,6 +2530,13 @@ struct net_if_addr *net_if_ipv6_addr_add(struct net_if *iface,
 
 	net_if_unlock(iface);
 
+	if (ifaddr != NULL && !do_dad && net_ipv6_is_ll_addr(&ifaddr->address.in6_addr)) {
+		/* Usable right away: the multicast groups joined so far were
+		 * reported with the unspecified source, RFC 3810 ch 5.2.13.
+		 */
+		net_ipv6_mld_report_all(iface);
+	}
+
 	if (ifaddr != NULL && join_mcast) {
 		/* The allnodes multicast group is only joined once as
 		 * net_ipv6_mld_join() checks if we have already
@@ -2683,6 +2727,7 @@ struct net_if_mcast_addr *net_if_ipv6_maddr_add(struct net_if *iface,
 {
 	struct net_if_mcast_addr *ifmaddr = NULL;
 	struct net_if_ipv6 *ipv6;
+	int ret;
 
 	if (iface == NULL || addr == NULL) {
 		return NULL;
@@ -2716,9 +2761,23 @@ struct net_if_mcast_addr *net_if_ipv6_maddr_add(struct net_if *iface,
 		ipv6->mcast[i].is_used = true;
 		ipv6->mcast[i].is_joined = false;
 		ipv6->mcast[i].address.family = NET_AF_INET6;
+#if defined(CONFIG_NET_IPV6_MLD)
+		ipv6->mcast[i].mld_resp_timeout = sys_timepoint_calc(K_FOREVER);
+		ipv6->mcast[i].mld_retx_timeout = sys_timepoint_calc(K_FOREVER);
+		ipv6->mcast[i].mld_retx_left = 0U;
+#endif
 		net_if_maddr_ref_init(&ipv6->mcast[i]);
 
 		memcpy(&ipv6->mcast[i].address.in6_addr, addr, 16);
+
+		ret = net_if_mcast_ip_addr_update(iface, &ipv6->mcast[i].address, true);
+		if ((ret < 0) && (ret != -ENOTSUP)) {
+			NET_DBG("Failed to add multicast address %s to iface %d (%p)",
+				net_sprint_ipv6_addr(addr), net_if_get_by_iface(iface),
+				iface);
+			ipv6->mcast[i].is_used = false;
+			goto out;
+		}
 
 		NET_DBG("[%zu] interface %d (%p) address %s added", i,
 			net_if_get_by_iface(iface), iface,
@@ -2780,6 +2839,8 @@ bool net_if_ipv6_maddr_rm(struct net_if *iface, const struct net_in6_addr *addr)
 		}
 
 		ipv6->mcast[i].is_used = false;
+
+		(void)net_if_mcast_ip_addr_update(iface, &ipv6->mcast[i].address, false);
 
 		NET_DBG("[%zu] interface %d (%p) address %s removed",
 			i, net_if_get_by_iface(iface), iface,
@@ -4299,6 +4360,14 @@ static void ipv4_config_defaults_set(struct net_if_ipv4 *ipv4)
 	ipv4->ttl = CONFIG_NET_INITIAL_TTL;
 	ipv4->mcast_ttl = CONFIG_NET_INITIAL_MCAST_TTL;
 
+#if defined(CONFIG_NET_IPV4_IGMP)
+	ipv4->igmp_general_timeout = sys_timepoint_calc(K_FOREVER);
+	/* No older version querier heard: the timers have expired */
+	ipv4->igmp_v1_querier_timeout = sys_timepoint_calc(K_NO_WAIT);
+	ipv4->igmp_v2_querier_timeout = sys_timepoint_calc(K_NO_WAIT);
+	ipv4->igmp_version = 0U;
+#endif
+
 	IF_ENABLED(CONFIG_NET_IPV4_ACD, (ipv4->conflict_cnt = 0));
 }
 #else
@@ -5677,6 +5746,7 @@ struct net_if_mcast_addr *net_if_ipv4_maddr_add(struct net_if *iface,
 						const struct net_in_addr *addr)
 {
 	struct net_if_mcast_addr *maddr = NULL;
+	int ret;
 
 	if (iface == NULL || addr == NULL) {
 		return NULL;
@@ -5708,9 +5778,24 @@ struct net_if_mcast_addr *net_if_ipv4_maddr_add(struct net_if *iface,
 		maddr->is_joined = false;
 		maddr->address.family = NET_AF_INET;
 		maddr->address.in_addr.s4_addr32[0] = addr->s4_addr32[0];
+#if defined(CONFIG_NET_IPV4_IGMP)
+		maddr->igmp_resp_timeout = sys_timepoint_calc(K_FOREVER);
+		maddr->igmp_retx_timeout = sys_timepoint_calc(K_FOREVER);
+		maddr->igmp_retx_left = 0U;
+#endif
 #if defined(CONFIG_NET_IPV4_IGMPV3)
 		maddr->sources_len = 0;
 #endif
+		ret = net_if_mcast_ip_addr_update(iface, &maddr->address, true);
+		if ((ret < 0) && (ret != -ENOTSUP)) {
+			NET_DBG("Failed to add multicast address %s to iface %d (%p)",
+				net_sprint_ipv4_addr(addr), net_if_get_by_iface(iface),
+				iface);
+			maddr->is_used = false;
+			maddr = NULL;
+			goto out;
+		}
+
 		net_if_maddr_ref_init(maddr);
 
 		NET_DBG("interface %d (%p) address %s added",
@@ -5760,6 +5845,8 @@ bool net_if_ipv4_maddr_rm(struct net_if *iface, const struct net_in_addr *addr)
 	}
 
 	maddr->is_used = false;
+
+	(void)net_if_mcast_ip_addr_update(iface, &maddr->address, false);
 
 	NET_DBG("interface %d (%p) address %s removed",
 		net_if_get_by_iface(iface), iface, net_sprint_ipv4_addr(addr));

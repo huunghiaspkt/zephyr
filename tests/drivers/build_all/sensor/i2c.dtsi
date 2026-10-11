@@ -1706,3 +1706,13 @@ test_i2c_pmsa003i: pmsa003i@dc {
 	reset-gpios = <&test_gpio 0 GPIO_ACTIVE_LOW>;
 	set-gpios = <&test_gpio 0 GPIO_ACTIVE_HIGH>;
 };
+
+test_i2c_tcs34725: tcs34725@dd {
+	compatible = "ams,tcs34725";
+	reg = <0xdd>;
+};
+
+test_i2c_vl53l5cx: vl53l5cx@de {
+	compatible = "st,vl53l5cx";
+	reg = <0xde>;
+};
