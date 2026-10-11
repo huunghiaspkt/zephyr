@@ -26,7 +26,7 @@ The folders mirror the training docs, ordered from first build to production wor
 From your workspace folder, with the virtual environment active:
 
 ```bash
-west build -p -b efz_esp32s3/esp32s3/procpu zephyr/samples/efz_samples/02_basic/ws2812
+west build -p -b efz_esp32s3/esp32s3/procpu zephyr/samples/efz_samples/02_basic/led_strip
 west flash
 ```
 
