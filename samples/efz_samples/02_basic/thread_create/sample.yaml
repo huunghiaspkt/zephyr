@@ -1,0 +1,13 @@
+sample:
+  name: Threads created with k_thread_create
+  description: "The threads sample with its three threads created at runtime by main() using k_thread_create"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+tests:
+  sample.efz.thread_create:
+    tags: efz
