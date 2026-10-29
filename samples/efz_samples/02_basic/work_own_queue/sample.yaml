@@ -1,0 +1,13 @@
+sample:
+  name: Move a slow job to its own work queue
+  description: "LED1 blinks from the system work queue; BN1 runs a slow job there and freezes it, BN2 runs it on its own queue"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+tests:
+  sample.efz.work_own_queue:
+    tags: efz

@@ -1,0 +1,13 @@
+sample:
+  name: Blink an LED with a work item
+  description: "A delayable work item toggles LED1 and reschedules itself, with no thread of its own"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+tests:
+  sample.efz.work_blink:
+    tags: efz

@@ -1,0 +1,13 @@
+sample:
+  name: Hand a button press to a work item
+  description: "The BN1 interrupt submits a work item; the work item toggles LED2 and counts interrupts and runs"
+common:
+  build_only: true
+  tags: efz
+  platform_allow:
+    - efz_esp32s3/esp32s3/procpu
+  integration_platforms:
+    - efz_esp32s3/esp32s3/procpu
+tests:
+  sample.efz.work_button:
+    tags: efz
