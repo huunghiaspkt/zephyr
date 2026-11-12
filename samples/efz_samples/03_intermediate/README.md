@@ -13,7 +13,6 @@ in `zephyr-training/03_intermediate/` — read the doc, then run the sample.
 | `threads_sync/` | `threads.md` | Mutex, semaphore, and message queue between threads |
 | `ble_basics/` | `ble-basics.md` | Minimal advertising + connection peripheral |
 | `i2c_sensor/` | `i2c-sensors.md` | Reading a sensor via Zephyr's sensor API |
-| `power_management/` | `power-management.md` | Idle states, device PM, and `pm_device` |
 | `custom_driver/` | `writing-drivers.md` | A small out-of-tree driver + its binding |
 | `layers_demo/` | `zephyr-layers.md` | Walking down: app → subsystem → driver → HAL |
 | `common_mistakes/` | `common-mistakes.md` | Worked examples of the top gotchas |
